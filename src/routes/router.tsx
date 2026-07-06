@@ -1,0 +1,34 @@
+import { createBrowserRouter } from "react-router-dom";
+import { AppShell } from "../components/layout/AppShell";
+import { ProtectedRoute } from "./ProtectedRoute";
+import { LoginPage } from "../pages/LoginPage";
+import { RegisterPage } from "../pages/RegisterPage";
+import { RequestsPage } from "../pages/RequestsPage";
+import { NewBookingPage } from "../pages/NewBookingPage";
+import { AvailabilityPage } from "../pages/AvailabilityPage";
+import { UsersPage } from "../pages/UsersPage";
+import { NotFoundPage } from "../pages/NotFoundPage";
+import { canManageUsers } from "../lib/types";
+
+export const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [
+          { path: "/", element: <RequestsPage /> },
+          { path: "/bookings/new", element: <NewBookingPage /> },
+          { path: "/availability", element: <AvailabilityPage /> },
+          {
+            element: <ProtectedRoute allow={canManageUsers} />,
+            children: [{ path: "/users", element: <UsersPage /> }],
+          },
+        ],
+      },
+    ],
+  },
+  { path: "*", element: <NotFoundPage /> },
+]);

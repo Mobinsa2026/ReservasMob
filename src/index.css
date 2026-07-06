@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import "react-day-picker/style.css";
+
+/* Colores de marca: Azul Rey (principal) y Azul Eléctrico (acento/vivo) */
+@theme {
+  --color-royal-50: #eef1f9;
+  --color-royal-100: #dde3f3;
+  --color-royal-200: #b9c5e6;
+  --color-royal-300: #94a8da;
+  --color-royal-400: #5d7ac2;
+  --color-royal-500: #3a5aa8;
+  --color-royal-600: #2a4ba0;
+  --color-royal-700: #21397d;
+  --color-royal-800: #1a2d63;
+  --color-royal-900: #16264f;
+
+  --color-electric-50: #e6f0ff;
+  --color-electric-100: #cce0ff;
+  --color-electric-200: #99c2ff;
+  --color-electric-300: #4d94ff;
+  --color-electric-400: #1a70ff;
+  --color-electric-500: #0057ff;
+  --color-electric-600: #0047d1;
+  --color-electric-700: #0038a3;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+.rdp-root {
+  --rdp-accent-color: #2a4ba0;
+  --rdp-today-color: #0057ff;
+}
+
+.rdp-day_booked button,
+.rdp-day_approved button,
+.rdp-day_pending button {
+  position: relative;
+}
+.rdp-day_booked button::after,
+.rdp-day_approved button::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  translate: -50% 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #f87171;
+}
+.rdp-day_pending button::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  translate: -50% 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #fbbf24;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
