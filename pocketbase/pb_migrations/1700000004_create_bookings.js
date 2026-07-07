@@ -17,7 +17,8 @@ migrate((app) => {
     createRule: "@request.auth.id != ''",
     updateRule:
       "@request.auth.role = 'rh' || @request.auth.role = 'admin' || @request.auth.role = 'adminvip'",
-    deleteRule: "@request.auth.role = 'admin' || @request.auth.role = 'adminvip'",
+    deleteRule:
+      "@request.auth.role = 'rh' || @request.auth.role = 'admin' || @request.auth.role = 'adminvip'",
     fields: [
       {
         type: "relation",

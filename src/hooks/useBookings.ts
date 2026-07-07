@@ -39,5 +39,9 @@ export function useBookings(scope: "mine" | "all") {
     setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
   }, []);
 
-  return { bookings, loading, reload: load, patchLocal };
+  const removeLocal = useCallback((id: string) => {
+    setBookings((prev) => prev.filter((b) => b.id !== id));
+  }, []);
+
+  return { bookings, loading, reload: load, patchLocal, removeLocal };
 }

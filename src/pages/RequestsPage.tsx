@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowUpDown, ClipboardList, Filter, Inbox, PlusCircle } from "lucide-react";
+import { ArrowUpDown, ClipboardList, Filter, Inbox, PlusCircle, User, Users } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useBookings } from "../hooks/useBookings";
 import { useRooms } from "../hooks/useRooms";
@@ -16,11 +16,14 @@ import { formatDateTime, formatRange, isPast } from "../utils/dateRange";
 export function RequestsPage() {
   const { user } = useAuth();
   const manage = user ? canManageRequests(user.role) : false;
-  const { bookings, loading, reload, patchLocal } = useBookings(manage ? "all" : "mine");
+  const [ownScope, setOwnScope] = useState<"mine" | "all">("mine");
+  const effectiveScope = manage ? "all" : ownScope;
+  const { bookings, loading, reload, patchLocal, removeLocal } = useBookings(effectiveScope);
   const { rooms } = useRooms();
   const [selected, setSelected] = useState<Booking | null>(null);
   const [roomFilter, setRoomFilter] = useState("");
   const [sortOrder, setSortOrder] = useState<"recent" | "oldest">("recent");
+  const showRequester = manage || ownScope === "all";
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -50,12 +53,14 @@ export function RequestsPage() {
           </span>
           <div>
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-              {manage ? "Todas las solicitudes" : "Mis solicitudes"}
+              {manage ? "Todas las solicitudes" : ownScope === "all" ? "Todas las solicitudes" : "Mis solicitudes"}
             </h1>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
               {manage
                 ? "Revisa, aprueba o rechaza las solicitudes de sala."
-                : "Consulta el estado de tus solicitudes y el motivo si fue rechazada."}
+                : ownScope === "all"
+                  ? "Tus solicitudes y las aprobadas de los demás."
+                  : "Consulta el estado de tus solicitudes y el motivo si fue rechazada."}
             </p>
           </div>
         </div>
@@ -77,6 +82,32 @@ export function RequestsPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+        {!manage && (
+          <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+            <button
+              type="button"
+              onClick={() => setOwnScope("mine")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                ownScope === "mine"
+                  ? "bg-white text-royal-700 shadow-sm dark:bg-neutral-700 dark:text-royal-300"
+                  : "text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+              }`}
+            >
+              <User size={14} /> Mis solicitudes
+            </button>
+            <button
+              type="button"
+              onClick={() => setOwnScope("all")}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                ownScope === "all"
+                  ? "bg-white text-royal-700 shadow-sm dark:bg-neutral-700 dark:text-royal-300"
+                  : "text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+              }`}
+            >
+              <Users size={14} /> Todas
+            </button>
+          </div>
+        )}
         {rooms.length > 0 && (
           <div className="flex items-center gap-2">
             <Filter size={15} className="text-neutral-400" />
@@ -138,7 +169,7 @@ export function RequestsPage() {
                   <th className="px-4 py-3 font-medium">Horario</th>
                   <th className="px-4 py-3 font-medium">Extras</th>
                   <th className="px-4 py-3 font-medium">Solicitada el</th>
-                  {manage && <th className="px-4 py-3 font-medium">Solicitante</th>}
+                  {showRequester && <th className="px-4 py-3 font-medium">Solicitante</th>}
                   <th className="px-4 py-3 font-medium">Estado</th>
                 </tr>
               </thead>
@@ -180,7 +211,7 @@ export function RequestsPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-neutral-600 dark:text-neutral-400">
                         {formatDateTime(b.created)}
                       </td>
-                      {manage && (
+                      {showRequester && (
                         <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
                           {b.requester_name || b.expand?.requested_by?.name || b.requester_email}
                         </td>
@@ -208,6 +239,10 @@ export function RequestsPage() {
             // otras filas (ej. rechazo automático de otras solicitudes del
             // mismo día).
             reload();
+          }}
+          onDeleted={(id) => {
+            removeLocal(id);
+            setSelected(null);
           }}
         />
       )}

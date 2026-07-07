@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Check, Clock4, User, Users as UsersIcon, X as XIcon } from "lucide-react";
+import { Check, Clock4, Trash2, User, Users as UsersIcon, X as XIcon } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { TextArea } from "../ui/Field";
@@ -17,13 +17,16 @@ export function BookingDetailModal({
   canManage,
   onClose,
   onUpdated,
+  onDeleted,
 }: {
   booking: Booking;
   canManage: boolean;
   onClose: () => void;
   onUpdated: (id: string, patch: Partial<Booking>) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [rejecting, setRejecting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,6 +78,20 @@ export function BookingDetailModal({
       onClose();
     } catch {
       setError("No se pudo rechazar la solicitud.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function remove() {
+    setError(null);
+    setLoading(true);
+    try {
+      await pb.collection("bookings").delete(booking.id);
+      onDeleted(booking.id);
+      onClose();
+    } catch {
+      setError("No se pudo eliminar la solicitud.");
     } finally {
       setLoading(false);
     }
@@ -211,6 +228,39 @@ export function BookingDetailModal({
                   Rechazar
                 </Button>
               </div>
+            )}
+          </div>
+        )}
+
+        {canManage && (
+          <div className="border-t border-neutral-100 pt-3 dark:border-neutral-800">
+            {confirmingDelete ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-500/30 dark:bg-red-500/10">
+                <p className="text-xs font-medium text-red-700 dark:text-red-300">
+                  ¿Eliminar esta solicitud permanentemente?
+                </p>
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="danger" onClick={remove} loading={loading}>
+                    Sí, eliminar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={loading}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-neutral-400 transition-colors hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
+              >
+                <Trash2 size={13} /> Eliminar solicitud
+              </button>
             )}
           </div>
         )}
