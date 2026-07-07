@@ -4,7 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sala de Reuniones 2</title>
+    <title>Sala de Reuniones</title>
+    <script type="text/javascript">
+      // Contraparte de public/404.html: decodifica la ruta real desde el
+      // querystring antes de que React Router monte, para que al recargar
+      // /ReservasMob/login (por ejemplo) la app abra esa misma ruta.
+      (function (l) {
+        if (l.search[1] === "/") {
+          var decoded = l.search
+            .slice(1)
+            .split("&")
+            .map(function (s) {
+              return s.replace(/~and~/g, "&");
+            })
+            .join("?");
+          window.history.replaceState(null, "", l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      })(window.location);
+    </script>
   </head>
   <body>
     <div id="root"></div>
