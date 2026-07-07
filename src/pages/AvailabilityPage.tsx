@@ -66,17 +66,19 @@ export function AvailabilityPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-soft dark:border-neutral-800 dark:bg-neutral-900">
-          <DayPicker
-            mode="single"
-            locale={es}
-            selected={selectedDay}
-            onSelect={(d) => d && setSelectedDay(d)}
-            modifiers={{ approved: approvedDays, pending: pendingDays }}
-            modifiersClassNames={{
-              approved: "rdp-day_approved",
-              pending: "rdp-day_pending",
-            }}
-          />
+          <div className="overflow-x-auto">
+            <DayPicker
+              mode="single"
+              locale={es}
+              selected={selectedDay}
+              onSelect={(d) => d && setSelectedDay(d)}
+              modifiers={{ approved: approvedDays, pending: pendingDays }}
+              modifiersClassNames={{
+                approved: "rdp-day_approved",
+                pending: "rdp-day_pending",
+              }}
+            />
+          </div>
           <div className="mt-3 flex flex-wrap gap-4 border-t border-neutral-100 pt-3 text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-red-400" /> Aprobada

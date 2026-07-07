@@ -15,10 +15,9 @@ migrate((app) => {
     viewRule:
       "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'adminvip' || @request.auth.role = 'rh' || requested_by = @request.auth.id || status = 'approved')",
     createRule: "@request.auth.id != ''",
-    updateRule:
-      "@request.auth.role = 'rh' || @request.auth.role = 'admin' || @request.auth.role = 'adminvip'",
+    updateRule: "@request.auth.role = 'rh'",
     deleteRule:
-      "@request.auth.role = 'rh' || @request.auth.role = 'admin' || @request.auth.role = 'adminvip'",
+      "@request.auth.role = 'rh' || @request.auth.role = 'admin' || @request.auth.role = 'adminvip' || requested_by = @request.auth.id",
     fields: [
       {
         type: "relation",
@@ -49,6 +48,7 @@ migrate((app) => {
         values: ["pending", "approved", "rejected"],
       },
       { type: "text", name: "rejection_reason" },
+      { type: "text", name: "approved_by_name" },
       { type: "autodate", name: "created", onCreate: true },
       { type: "autodate", name: "updated", onCreate: true, onUpdate: true },
     ],

@@ -95,9 +95,20 @@ cronAdd("rejectStaleBookings", "*/5 * * * *", () => {
   }
 });
 
-// Notifica (en la app, sin correo por ahora) a todo RH/Admin/AdminVip de que
-// llegó una solicitud nueva.
+// Notifica (en la app) a todo RH/Admin/AdminVip de que llegó una solicitud
+// nueva, y manda un correo real a los destinatarios configurados en la sala
+// (campo "notify_emails" de rooms) — esos correos pueden no ser cuentas del
+// sistema, solo bandejas donde RH revisa las solicitudes de su sede.
 onRecordAfterCreateSuccess((e) => {
+  const room = (() => {
+    try {
+      return e.app.findRecordById("rooms", e.record.get("room"));
+    } catch (_) {
+      return null;
+    }
+  })();
+  const roomName = room?.get("name") ?? "una sala";
+
   try {
     const managers = e.app.findRecordsByFilter(
       "users",
@@ -106,13 +117,6 @@ onRecordAfterCreateSuccess((e) => {
       0,
       0,
     );
-    const roomName = (() => {
-      try {
-        return e.app.findRecordById("rooms", e.record.get("room")).get("name");
-      } catch (_) {
-        return "una sala";
-      }
-    })();
 
     for (const manager of managers) {
       const notif = new Record(e.app.findCollectionByNameOrId("notifications"));
@@ -128,6 +132,79 @@ onRecordAfterCreateSuccess((e) => {
     }
   } catch (err) {
     console.log("Error creando notificaciones de nueva solicitud:", err);
+  }
+
+  try {
+    const emailsRaw = room?.get("notify_emails") ?? "";
+    const emails = emailsRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (emails.length > 0) {
+      const extraLabels = {
+        wants_coffee: "Café",
+        wants_cookies: "Galletas",
+        wants_water: "Agua",
+        wants_snack: "Snack",
+      };
+      const extrasRequested = Object.keys(extraLabels).filter((key) => e.record.get(key));
+      const extrasText = e.record.get("no_extras")
+        ? "Nada extra"
+        : extrasRequested.length > 0
+          ? extrasRequested.map((key) => extraLabels[key]).join(", ")
+          : "—";
+
+      // Los campos "start"/"end" se guardan en UTC; se leen con los
+      // getters locales (no los "UTC*") para mostrar la hora que la
+      // persona realmente eligió, asumiendo que el servidor corre en la
+      // misma zona horaria que quienes usan la app (misma oficina).
+      const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+      const pad = (n) => String(n).padStart(2, "0");
+      const start = new Date(e.record.get("start"));
+      const end = new Date(e.record.get("end"));
+      const horario = `${start.getDate()} ${meses[start.getMonth()]} ${start.getFullYear()}, ${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+      const row = (label, value) => `
+        <tr>
+          <td style="padding:10px 0; border-top:1px solid #eef1f9; color:#6b7280; font-size:13px; width:130px; vertical-align:top;">${label}</td>
+          <td style="padding:10px 0; border-top:1px solid #eef1f9; color:#16264f; font-size:14px; font-weight:600;">${value}</td>
+        </tr>`;
+
+      const message = new MailerMessage({
+        from: {
+          address: e.app.settings().meta.senderAddress,
+          name: e.app.settings().meta.senderName,
+        },
+        to: emails.map((address) => ({ address })),
+        subject: `Nueva solicitud de sala: ${roomName}`,
+        html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto;">
+            <div style="background:#2a4ba0; padding:20px 24px; border-radius:12px 12px 0 0;">
+              <p style="margin:0; color:#ffffff; font-size:17px; font-weight:600;">Nueva solicitud de sala</p>
+            </div>
+            <div style="border:1px solid #e2e5ec; border-top:none; border-radius:0 0 12px 12px; padding:20px 24px;">
+              <p style="margin:0 0 12px; color:#16264f; font-size:15px;">
+                Se solicitó <strong>${roomName}</strong>. Entra al sistema para aprobarla o rechazarla.
+              </p>
+              <table style="width:100%; border-collapse:collapse;">
+                ${row("Solicitante", e.record.get("requester_name"))}
+                ${row("Horario", horario)}
+                ${row("Personas", e.record.get("people_count"))}
+                ${row("Motivo", e.record.get("reason"))}
+                ${row("Extras", extrasText)}
+              </table>
+            </div>
+            <p style="margin:16px 0 0; text-align:center; color:#9ca3af; font-size:11px;">
+              Correo automático del sistema de reservas de salas — no responder.
+            </p>
+          </div>
+        `,
+      });
+      e.app.newMailClient().send(message);
+    }
+  } catch (err) {
+    console.log("Error enviando correo de nueva solicitud:", err);
   }
 
   e.next();
@@ -153,9 +230,16 @@ onRecordUpdateRequest((e) => {
   if (newStatus === "rejected" && !e.record.get("rejection_reason")) {
     throw new BadRequestError("Debes indicar una razón de rechazo.");
   }
+  if (newStatus === "rejected") {
+    e.record.set("approved_by_name", "");
+  }
 
   if (newStatus === "approved") {
     e.record.set("rejection_reason", "");
+    // Se guarda como texto plano (no relación) porque el solicitante no
+    // necesariamente tiene permiso para ver el registro de usuario de quien
+    // aprobó (RH/Admin no son visibles entre sí vía las reglas de "users").
+    e.record.set("approved_by_name", e.auth.get("name") || e.auth.get("email"));
 
     const room = e.record.get("room");
     const start = e.record.get("start");
@@ -235,6 +319,63 @@ onRecordAfterUpdateSuccess((e) => {
     } catch (err) {
       console.log("Error creando notificación de rechazo:", err);
     }
+
+    try {
+      const requesterEmail = e.record.get("requester_email");
+      if (requesterEmail) {
+        const roomName = (() => {
+          try {
+            return e.app.findRecordById("rooms", e.record.get("room")).get("name");
+          } catch (_) {
+            return "una sala";
+          }
+        })();
+
+        const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        const pad = (n) => String(n).padStart(2, "0");
+        const start = new Date(e.record.get("start"));
+        const end = new Date(e.record.get("end"));
+        const horario = `${start.getDate()} ${meses[start.getMonth()]} ${start.getFullYear()}, ${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+        const row = (label, value) => `
+          <tr>
+            <td style="padding:10px 0; border-top:1px solid #eef1f9; color:#6b7280; font-size:13px; width:130px; vertical-align:top;">${label}</td>
+            <td style="padding:10px 0; border-top:1px solid #eef1f9; color:#16264f; font-size:14px; font-weight:600;">${value}</td>
+          </tr>`;
+
+        const message = new MailerMessage({
+          from: {
+            address: e.app.settings().meta.senderAddress,
+            name: e.app.settings().meta.senderName,
+          },
+          to: [{ address: requesterEmail }],
+          subject: `Solicitud rechazada: ${roomName}`,
+          html: `
+            <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto;">
+              <div style="background:#dc2626; padding:20px 24px; border-radius:12px 12px 0 0;">
+                <p style="margin:0; color:#ffffff; font-size:17px; font-weight:600;">Solicitud rechazada</p>
+              </div>
+              <div style="border:1px solid #e2e5ec; border-top:none; border-radius:0 0 12px 12px; padding:20px 24px;">
+                <p style="margin:0 0 12px; color:#16264f; font-size:15px;">
+                  Tu solicitud de <strong>${roomName}</strong> fue rechazada.
+                </p>
+                <table style="width:100%; border-collapse:collapse;">
+                  ${row("Horario", horario)}
+                  ${row("Motivo original", e.record.get("reason"))}
+                  ${row("Razón de rechazo", e.record.get("rejection_reason"))}
+                </table>
+              </div>
+              <p style="margin:16px 0 0; text-align:center; color:#9ca3af; font-size:11px;">
+                Correo automático del sistema de reservas de salas — no responder.
+              </p>
+            </div>
+          `,
+        });
+        e.app.newMailClient().send(message);
+      }
+    } catch (err) {
+      console.log("Error enviando correo de rechazo:", err);
+    }
   }
 
   if (statusChanged && status === "approved") {
@@ -256,6 +397,83 @@ onRecordAfterUpdateSuccess((e) => {
       e.app.save(requesterNotif);
     } catch (err) {
       console.log("Error creando notificación de aprobación:", err);
+    }
+
+    try {
+      const requesterEmail = e.record.get("requester_email");
+      if (requesterEmail) {
+        const roomName = (() => {
+          try {
+            return e.app.findRecordById("rooms", e.record.get("room")).get("name");
+          } catch (_) {
+            return "una sala";
+          }
+        })();
+
+        const extraLabels = {
+          wants_coffee: { label: "Café", approvedKey: "coffee_approved" },
+          wants_cookies: { label: "Galletas", approvedKey: "cookies_approved" },
+          wants_water: { label: "Agua", approvedKey: "water_approved" },
+          wants_snack: { label: "Snack", approvedKey: "snack_approved" },
+        };
+        const extrasRequested = Object.keys(extraLabels).filter((key) => e.record.get(key));
+        const extrasText = e.record.get("no_extras")
+          ? "Nada extra"
+          : extrasRequested.length > 0
+            ? extrasRequested
+                .map(
+                  (key) =>
+                    `${extraLabels[key].label} (${e.record.get(extraLabels[key].approvedKey) ? "sí" : "no disponible"})`,
+                )
+                .join(", ")
+            : "—";
+
+        const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        const pad = (n) => String(n).padStart(2, "0");
+        const start = new Date(e.record.get("start"));
+        const end = new Date(e.record.get("end"));
+        const horario = `${start.getDate()} ${meses[start.getMonth()]} ${start.getFullYear()}, ${pad(start.getHours())}:${pad(start.getMinutes())} – ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+        const row = (label, value) => `
+          <tr>
+            <td style="padding:10px 0; border-top:1px solid #eef1f9; color:#6b7280; font-size:13px; width:130px; vertical-align:top;">${label}</td>
+            <td style="padding:10px 0; border-top:1px solid #eef1f9; color:#16264f; font-size:14px; font-weight:600;">${value}</td>
+          </tr>`;
+
+        const message = new MailerMessage({
+          from: {
+            address: e.app.settings().meta.senderAddress,
+            name: e.app.settings().meta.senderName,
+          },
+          to: [{ address: requesterEmail }],
+          subject: `Solicitud aprobada: ${roomName}`,
+          html: `
+            <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto;">
+              <div style="background:#059669; padding:20px 24px; border-radius:12px 12px 0 0;">
+                <p style="margin:0; color:#ffffff; font-size:17px; font-weight:600;">Solicitud aprobada</p>
+              </div>
+              <div style="border:1px solid #e2e5ec; border-top:none; border-radius:0 0 12px 12px; padding:20px 24px;">
+                <p style="margin:0 0 12px; color:#16264f; font-size:15px;">
+                  Tu solicitud de <strong>${roomName}</strong> fue aprobada.
+                </p>
+                <table style="width:100%; border-collapse:collapse;">
+                  ${row("Horario", horario)}
+                  ${row("Personas", e.record.get("people_count"))}
+                  ${row("Motivo", e.record.get("reason"))}
+                  ${row("Extras", extrasText)}
+                  ${row("Aprobada por", e.record.get("approved_by_name"))}
+                </table>
+              </div>
+              <p style="margin:16px 0 0; text-align:center; color:#9ca3af; font-size:11px;">
+                Correo automático del sistema de reservas de salas — no responder.
+              </p>
+            </div>
+          `,
+        });
+        e.app.newMailClient().send(message);
+      }
+    } catch (err) {
+      console.log("Error enviando correo de aprobación:", err);
     }
 
     try {

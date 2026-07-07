@@ -152,7 +152,7 @@ export function NewBookingPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-soft dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-soft sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
           <Select
             label="Sala"
             icon={<Building2 size={16} />}
@@ -218,7 +218,7 @@ export function NewBookingPage() {
             <span className="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
               ¿Necesitas algo para la reunión?
             </span>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <ExtraOptionCard
                 icon={<EXTRA_ICONS.wants_coffee size={18} />}
                 label="Café"
@@ -287,20 +287,22 @@ export function NewBookingPage() {
           </Button>
         </div>
 
-        <div className="h-fit rounded-2xl border border-neutral-200 bg-white p-5 shadow-soft dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="h-fit rounded-2xl border border-neutral-200 bg-white p-4 shadow-soft sm:p-5 dark:border-neutral-800 dark:bg-neutral-900">
           <p className="mb-3 flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
             <MessageSquare size={16} className="text-royal-600 dark:text-royal-400" />
             Elige el día
           </p>
-          <DayPicker
-            mode="single"
-            locale={es}
-            selected={day}
-            onSelect={setDay}
-            disabled={[{ before: new Date() }, ...approvedDays]}
-            modifiers={{ booked: approvedDays }}
-            modifiersClassNames={{ booked: "rdp-day_booked" }}
-          />
+          <div className="overflow-x-auto">
+            <DayPicker
+              mode="single"
+              locale={es}
+              selected={day}
+              onSelect={setDay}
+              disabled={[{ before: new Date() }, ...approvedDays]}
+              modifiers={{ booked: approvedDays }}
+              modifiersClassNames={{ booked: "rdp-day_booked" }}
+            />
+          </div>
           <p className="mt-2 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
             <span className="inline-block h-2 w-2 rounded-full bg-red-400" /> Días ya reservados
             (sala completa, no seleccionables)

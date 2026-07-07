@@ -12,6 +12,8 @@ migrate((app) => {
       { type: "text", name: "name", required: true, min: 1 },
       { type: "number", name: "capacity" },
       { type: "bool", name: "active" },
+      { type: "text", name: "location" },
+      { type: "text", name: "notify_emails" },
       { type: "autodate", name: "created", onCreate: true },
       { type: "autodate", name: "updated", onCreate: true, onUpdate: true },
     ],

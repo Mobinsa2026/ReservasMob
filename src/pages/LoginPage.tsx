@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Lock, Mail } from "lucide-react";
+import { ClientResponseError } from "pocketbase";
 import { Logo } from "../components/layout/Logo";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Field";
@@ -23,8 +24,14 @@ export function LoginPage() {
     try {
       await login(email, password);
       navigate("/");
-    } catch {
-      setError("Correo o contraseña incorrectos.");
+    } catch (err) {
+      if (err instanceof ClientResponseError && err.status === 0) {
+        setError(
+          "No se pudo conectar con el servidor. Verifica que tu dispositivo esté en la misma red y que la app siga encendida en la otra computadora.",
+        );
+      } else {
+        setError("Correo o contraseña incorrectos.");
+      }
     } finally {
       setLoading(false);
     }
@@ -32,7 +39,7 @@ export function LoginPage() {
 
   return (
     <div className="bg-app-gradient flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
-      <div className="w-full max-w-sm animate-[scaleIn_0.25s_ease-out] rounded-2xl border border-neutral-200 bg-white p-8 shadow-soft-lg dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="w-full max-w-sm animate-[scaleIn_0.25s_ease-out] rounded-2xl border border-neutral-200 bg-white p-6 shadow-soft-lg sm:p-8 dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mb-6 flex justify-center">
           <Logo />
         </div>

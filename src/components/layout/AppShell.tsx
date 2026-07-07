@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
+  Building2,
   CalendarDays,
   ClipboardList,
   LogOut,
@@ -82,6 +83,18 @@ export function AppShell() {
                 <Users size={16} />
               </NavIcon>
               Usuarios
+            </>
+          )}
+        </NavLink>
+      )}
+      {canManageUsers(user.role) && (
+        <NavLink to="/rooms" className={navItemClass} onClick={() => setOpen(false)}>
+          {({ isActive }) => (
+            <>
+              <NavIcon isActive={isActive}>
+                <Building2 size={16} />
+              </NavIcon>
+              Salas
             </>
           )}
         </NavLink>

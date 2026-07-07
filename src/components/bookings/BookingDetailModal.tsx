@@ -14,13 +14,15 @@ import { EXTRA_ICONS } from "./extraIcons";
 
 export function BookingDetailModal({
   booking,
-  canManage,
+  canApprove,
+  canDelete,
   onClose,
   onUpdated,
   onDeleted,
 }: {
   booking: Booking;
-  canManage: boolean;
+  canApprove: boolean;
+  canDelete: boolean;
   onClose: () => void;
   onUpdated: (id: string, patch: Partial<Booking>) => void;
   onDeleted: (id: string) => void;
@@ -32,8 +34,17 @@ export function BookingDetailModal({
   const [loading, setLoading] = useState(false);
 
   const requestedExtras = EXTRA_ITEMS.filter((item) => booking[item.key]);
+  // Al crear la solicitud el hook deja todos los "*_approved" en false (son
+  // solo un valor por defecto en la base, no una decisión real de nadie
+  // todavía). Mientras esté pendiente, se muestran como disponibles por
+  // default: RH desmarca lo que no se pueda cumplir, no al revés.
   const [extrasApproval, setExtrasApproval] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(requestedExtras.map((item) => [item.approvedKey, booking[item.approvedKey] ?? true])),
+    Object.fromEntries(
+      requestedExtras.map((item) => [
+        item.approvedKey,
+        booking.status === "pending" ? true : (booking[item.approvedKey] ?? true),
+      ]),
+    ),
   );
   const [extrasComment, setExtrasComment] = useState(booking.extras_comment ?? "");
 
@@ -111,6 +122,9 @@ export function BookingDetailModal({
         </div>
         <InfoTile icon={<User size={15} />} label="Solicitante" value={requesterName} />
         <Detail label="Motivo" value={booking.reason} />
+        {booking.status === "approved" && booking.approved_by_name && (
+          <Detail label="Aprobada por" value={booking.approved_by_name} />
+        )}
         {booking.status === "rejected" && booking.rejection_reason && (
           <Detail label="Razón de rechazo" value={booking.rejection_reason} tone="danger" />
         )}
@@ -121,7 +135,7 @@ export function BookingDetailModal({
           </span>
           {requestedExtras.length === 0 ? (
             <p className="mt-2 text-neutral-500 dark:text-neutral-400">No solicitó nada extra.</p>
-          ) : canManage && booking.status === "pending" ? (
+          ) : canApprove && booking.status === "pending" ? (
             <div className="mt-2 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 Desmarca lo que no se pueda cumplir y explica por qué en el comentario.
@@ -171,6 +185,28 @@ export function BookingDetailModal({
                 placeholder="Ej. no hay café disponible por el momento"
               />
             </div>
+          ) : booking.status === "pending" ? (
+            // Pendiente pero quien ve el detalle no puede aprobar (ej. Admin/
+            // AdminVip, o el propio solicitante): todavía no hay una decisión
+            // de RH, así que solo se muestra qué se pidió, sin afirmar
+            // "no disponible" (el campo *_approved aquí es solo un default
+            // en false, no una respuesta real todavía).
+            <div className="mt-2 flex flex-wrap gap-2">
+              {requestedExtras.map((item) => {
+                const Icon = EXTRA_ICONS[item.key];
+                return (
+                  <span
+                    key={item.key}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                  >
+                    <Icon size={13} /> {item.label}
+                  </span>
+                );
+              })}
+              <p className="mt-1 w-full text-xs text-neutral-400 dark:text-neutral-500">
+                Pendiente de revisión por RH.
+              </p>
+            </div>
           ) : (
             <div className="mt-2 flex flex-wrap gap-2">
               {requestedExtras.map((item) => {
@@ -200,7 +236,7 @@ export function BookingDetailModal({
 
         <Alert variant="error" message={error} />
 
-        {canManage && booking.status === "pending" && (
+        {canApprove && booking.status === "pending" && (
           <div className="mt-4 space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
             {rejecting ? (
               <>
@@ -232,7 +268,7 @@ export function BookingDetailModal({
           </div>
         )}
 
-        {canManage && (
+        {canDelete && (
           <div className="border-t border-neutral-100 pt-3 dark:border-neutral-800">
             {confirmingDelete ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-500/30 dark:bg-red-500/10">

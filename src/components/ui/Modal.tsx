@@ -15,11 +15,11 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
+        className="absolute inset-0 bg-neutral-900/20 animate-[fadeIn_0.15s_ease-out]"
         onClick={onClose}
       />
       <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-soft-lg ring-1 ring-black/5 animate-[scaleIn_0.18s_ease-out] dark:bg-neutral-900 dark:ring-white/10">
-        <div className="flex items-start justify-between gap-4 border-b border-neutral-100 px-6 py-4 dark:border-neutral-800">
+        <div className="flex items-start justify-between gap-4 border-b border-neutral-100 px-4 py-4 sm:px-6 dark:border-neutral-800">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-semibold text-neutral-900 dark:text-neutral-100">
               {title}
@@ -38,7 +38,7 @@ export function Modal({
             <X size={18} />
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-5">{children}</div>
+        <div className="overflow-y-auto px-4 py-5 sm:px-6">{children}</div>
       </div>
     </div>
   );

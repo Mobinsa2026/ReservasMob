@@ -4,7 +4,7 @@ import { ArrowUpDown, ClipboardList, Filter, Inbox, PlusCircle, User, Users } fr
 import { useAuth } from "../context/AuthContext";
 import { useBookings } from "../hooks/useBookings";
 import { useRooms } from "../hooks/useRooms";
-import { canManageRequests, EXTRA_ITEMS } from "../lib/types";
+import { canApproveRequests, canManageRequests, EXTRA_ITEMS } from "../lib/types";
 import type { Booking } from "../lib/types";
 import { StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -16,6 +16,7 @@ import { formatDateTime, formatRange, isPast } from "../utils/dateRange";
 export function RequestsPage() {
   const { user } = useAuth();
   const manage = user ? canManageRequests(user.role) : false;
+  const canApprove = user ? canApproveRequests(user.role) : false;
   const [ownScope, setOwnScope] = useState<"mine" | "all">("mine");
   const effectiveScope = manage ? "all" : ownScope;
   const { bookings, loading, reload, patchLocal, removeLocal } = useBookings(effectiveScope);
@@ -57,7 +58,9 @@ export function RequestsPage() {
             </h1>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
               {manage
-                ? "Revisa, aprueba o rechaza las solicitudes de sala."
+                ? canApprove
+                  ? "Revisa, aprueba o rechaza las solicitudes de sala."
+                  : "Consulta todas las solicitudes de sala (solo RH puede aprobar o rechazar)."
                 : ownScope === "all"
                   ? "Tus solicitudes y las aprobadas de los demás."
                   : "Consulta el estado de tus solicitudes y el motivo si fue rechazada."}
@@ -231,7 +234,8 @@ export function RequestsPage() {
       {selected && (
         <BookingDetailModal
           booking={selected}
-          canManage={manage}
+          canApprove={canApprove}
+          canDelete={manage || selected.requested_by === user?.id}
           onClose={() => setSelected(null)}
           onUpdated={(id, patch) => {
             patchLocal(id, patch);

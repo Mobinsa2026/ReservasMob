@@ -7,6 +7,7 @@ import { RequestsPage } from "../pages/RequestsPage";
 import { NewBookingPage } from "../pages/NewBookingPage";
 import { AvailabilityPage } from "../pages/AvailabilityPage";
 import { UsersPage } from "../pages/UsersPage";
+import { RoomsPage } from "../pages/RoomsPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { canManageUsers } from "../lib/types";
 
@@ -25,7 +26,10 @@ export const router = createBrowserRouter(
             { path: "/availability", element: <AvailabilityPage /> },
             {
               element: <ProtectedRoute allow={canManageUsers} />,
-              children: [{ path: "/users", element: <UsersPage /> }],
+              children: [
+                { path: "/users", element: <UsersPage /> },
+                { path: "/rooms", element: <RoomsPage /> },
+              ],
             },
           ],
         },

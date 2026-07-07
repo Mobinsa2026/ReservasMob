@@ -28,6 +28,8 @@ pocketbase/*.exe
 pocketbase/pocketbase
 pocketbase/pb_data/
 pocketbase/pb_logs/
+pocketbase/pb_public/
+pocketbase/pocketbase.log
 
 # Env
 .env

@@ -14,6 +14,8 @@ export interface Room extends RecordModel {
   name: string;
   capacity?: number;
   active: boolean;
+  location?: string;
+  notify_emails?: string;
 }
 
 export interface Booking extends RecordModel {
@@ -27,6 +29,7 @@ export interface Booking extends RecordModel {
   requested_by: string;
   status: BookingStatus;
   rejection_reason?: string;
+  approved_by_name?: string;
   wants_coffee: boolean;
   wants_cookies: boolean;
   wants_water: boolean;
@@ -73,8 +76,15 @@ export const STATUS_LABELS: Record<BookingStatus, string> = {
   rejected: "Rechazada",
 };
 
+// Quién puede VER todas las solicitudes (no solo las propias).
 export function canManageRequests(role: Role): boolean {
   return role === "rh" || role === "admin" || role === "adminvip";
+}
+
+// Quién puede APROBAR/RECHAZAR: exclusivo de RH. Admin/AdminVip pueden ver
+// todo pero ya no actúan sobre las solicitudes.
+export function canApproveRequests(role: Role): boolean {
+  return role === "rh";
 }
 
 export function canManageUsers(role: Role): boolean {
