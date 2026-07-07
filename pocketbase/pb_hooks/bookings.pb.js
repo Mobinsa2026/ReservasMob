@@ -1,10 +1,11 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// El cliente nunca decide quién solicita ni el estado inicial. Una sala solo
-// puede tener UNA reserva aprobada por día: si ya hay una aprobada ese día,
-// se bloquea la creación. Las solicitudes pendientes del mismo día NO se
-// bloquean entre sí (varias personas pueden competir por el mismo día; la
-// primera que se apruebe rechaza automáticamente a las demás, ver abajo).
+// El cliente nunca decide quién solicita ni el estado inicial. Una sala se
+// bloquea por HORARIO, no por día completo: dos aprobadas pueden coexistir el
+// mismo día si sus horarios no se traslapan. Las solicitudes pendientes con
+// horario traslapado NO se bloquean entre sí (varias personas pueden competir
+// por el mismo horario; la primera que se apruebe rechaza automáticamente a
+// las demás que sí se traslapen, ver abajo).
 onRecordCreateRequest((e) => {
   e.record.set("requested_by", e.auth.id);
   // El correo ya no lo captura el formulario (se pedía para un correo de
@@ -42,24 +43,16 @@ onRecordCreateRequest((e) => {
     throw new BadRequestError("No se puede reservar en una fecha/hora pasada.");
   }
 
-  const d = new Date(start);
-  const dayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-    .toISOString()
-    .replace("T", " ");
-  const dayEnd = new Date(new Date(dayStart.replace(" ", "T")).getTime() + 24 * 60 * 60 * 1000)
-    .toISOString()
-    .replace("T", " ");
-
-  const approvedSameDay = e.app.findRecordsByFilter(
+  const approvedOverlap = e.app.findRecordsByFilter(
     "bookings",
-    "room = {:room} && status = 'approved' && start >= {:dayStart} && start < {:dayEnd}",
+    "room = {:room} && status = 'approved' && start < {:end} && end > {:start}",
     "",
     1,
     0,
-    { room, dayStart, dayEnd },
+    { room, start, end },
   );
-  if (approvedSameDay.length > 0) {
-    throw new BadRequestError("Ya hay una reserva aprobada para esta sala ese día.");
+  if (approvedOverlap.length > 0) {
+    throw new BadRequestError("Ese horario se traslapa con una reserva ya aprobada para esta sala.");
   }
 
   e.next();
@@ -243,24 +236,18 @@ onRecordUpdateRequest((e) => {
 
     const room = e.record.get("room");
     const start = e.record.get("start");
-    const d = new Date(start);
-    const dayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-      .toISOString()
-      .replace("T", " ");
-    const dayEnd = new Date(new Date(dayStart.replace(" ", "T")).getTime() + 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace("T", " ");
+    const end = e.record.get("end");
 
-    const approvedSameDay = e.app.findRecordsByFilter(
+    const approvedOverlap = e.app.findRecordsByFilter(
       "bookings",
-      "room = {:room} && status = 'approved' && start >= {:dayStart} && start < {:dayEnd} && id != {:id}",
+      "room = {:room} && status = 'approved' && start < {:end} && end > {:start} && id != {:id}",
       "",
       1,
       0,
-      { room, dayStart, dayEnd, id: e.record.id },
+      { room, start, end, id: e.record.id },
     );
-    if (approvedSameDay.length > 0) {
-      throw new BadRequestError("Ya hay otra reserva aprobada para esta sala ese día.");
+    if (approvedOverlap.length > 0) {
+      throw new BadRequestError("Ese horario se traslapa con otra reserva ya aprobada para esta sala.");
     }
   }
 
@@ -479,25 +466,19 @@ onRecordAfterUpdateSuccess((e) => {
     try {
       const room = e.record.get("room");
       const start = e.record.get("start");
-      const d = new Date(start);
-      const dayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-        .toISOString()
-        .replace("T", " ");
-      const dayEnd = new Date(new Date(dayStart.replace(" ", "T")).getTime() + 24 * 60 * 60 * 1000)
-        .toISOString()
-        .replace("T", " ");
+      const end = e.record.get("end");
 
       const others = e.app.findRecordsByFilter(
         "bookings",
-        "room = {:room} && status = 'pending' && start >= {:dayStart} && start < {:dayEnd} && id != {:id}",
+        "room = {:room} && status = 'pending' && start < {:end} && end > {:start} && id != {:id}",
         "",
         0,
         0,
-        { room, dayStart, dayEnd, id: e.record.id },
+        { room, start, end, id: e.record.id },
       );
 
       const autoReason =
-        "Se aprobó otra solicitud para esta sala en la misma fecha, por lo que ya no está disponible.";
+        "Se aprobó otra solicitud para esta sala en un horario que se traslapa con el tuyo, por lo que ya no está disponible.";
 
       // No creamos notificación aquí: guardar "other" con status="rejected"
       // vuelve a disparar este mismo hook para ese registro, y el bloque de
@@ -509,7 +490,7 @@ onRecordAfterUpdateSuccess((e) => {
         e.app.save(other);
       }
     } catch (err) {
-      console.log("Error al rechazar automáticamente solicitudes del mismo día:", err);
+      console.log("Error al rechazar automáticamente solicitudes con horario traslapado:", err);
     }
   }
 

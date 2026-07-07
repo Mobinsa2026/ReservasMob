@@ -63,13 +63,19 @@ export function NewBookingPage() {
 
   const { bookings: roomBookings } = useRoomAvailability(roomId || undefined);
 
+  // Marcadores informativos en el calendario (no bloquean el día completo:
+  // el bloqueo real es por horario, no por día).
   const approvedDays = useMemo(
     () => roomBookings.filter((b) => b.status === "approved").map((b) => new Date(b.start)),
     [roomBookings],
   );
+  const pendingDays = useMemo(
+    () => roomBookings.filter((b) => b.status === "pending").map((b) => new Date(b.start)),
+    [roomBookings],
+  );
 
   // Solicitudes pendientes de OTRAS personas para el día elegido: no bloquean,
-  // pero avisamos porque solo una puede terminar aprobada para ese día.
+  // pero avisamos porque podrían competir por el mismo horario.
   const pendingSameDayFromOthers = useMemo(() => {
     if (!day) return [];
     return roomBookings.filter(
@@ -80,10 +86,22 @@ export function NewBookingPage() {
     );
   }, [roomBookings, day, user?.id]);
 
-  const dayAlreadyApproved = useMemo(() => {
-    if (!day) return false;
-    return approvedDays.some((d) => isSameDay(d, day));
-  }, [approvedDays, day]);
+  // El bloqueo real es por horario: dos reservas aprobadas pueden coexistir
+  // el mismo día si no se traslapan (ej. 9-13 y 13-15).
+  const selectedRange = useMemo(() => {
+    if (!day) return null;
+    return { start: combineDateAndTime(day, startTime), end: combineDateAndTime(day, endTime) };
+  }, [day, startTime, endTime]);
+
+  const overlapsApproved = useMemo(() => {
+    if (!selectedRange) return false;
+    return roomBookings.some(
+      (b) =>
+        b.status === "approved" &&
+        new Date(b.start) < selectedRange.end &&
+        new Date(b.end) > selectedRange.start,
+    );
+  }, [roomBookings, selectedRange]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -102,8 +120,8 @@ export function NewBookingPage() {
     if (start < new Date()) {
       return setError("No puedes reservar en una fecha/hora pasada.");
     }
-    if (dayAlreadyApproved) {
-      return setError("Ya hay una reserva aprobada para esta sala ese día.");
+    if (overlapsApproved) {
+      return setError("Ese horario se traslapa con una reserva ya aprobada para esta sala.");
     }
     if (nothingChosenYet) {
       return setError(
@@ -145,8 +163,8 @@ export function NewBookingPage() {
             Nueva solicitud de sala
           </h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Elige la sala, el día y el horario. Una sala solo puede tener una reserva aprobada por
-            día.
+            Elige la sala, el día y el horario. Una sala puede tener varias reservas aprobadas el
+            mismo día, siempre que no se traslapen los horarios.
           </p>
         </div>
       </div>
@@ -271,7 +289,15 @@ export function NewBookingPage() {
             variant="warning"
             message={
               pendingSameDayFromOthers.length > 0 &&
-              `Ya hay ${pendingSameDayFromOthers.length === 1 ? "otra solicitud pendiente" : "otras solicitudes pendientes"} para esta sala ese mismo día. Solo una puede ser aprobada, así que la tuya podría ser rechazada si aprueban la otra primero.`
+              `Hay ${pendingSameDayFromOthers.length === 1 ? "otra solicitud pendiente" : "otras solicitudes pendientes"} para esta sala ese mismo día. Si el horario se traslapa con el tuyo, solo una podrá ser aprobada.`
+            }
+          />
+
+          <Alert
+            variant="warning"
+            message={
+              overlapsApproved &&
+              "El horario elegido se traslapa con una reserva ya aprobada para esta sala. Elige otro horario ese mismo día o cambia de sala."
             }
           />
 
@@ -280,7 +306,7 @@ export function NewBookingPage() {
           <Button
             type="submit"
             loading={loading}
-            disabled={dayAlreadyApproved}
+            disabled={overlapsApproved}
             className="w-full md:w-auto"
           >
             {loading ? "Enviando..." : "Enviar solicitud"}
@@ -298,14 +324,20 @@ export function NewBookingPage() {
               locale={es}
               selected={day}
               onSelect={setDay}
-              disabled={[{ before: new Date() }, ...approvedDays]}
-              modifiers={{ booked: approvedDays }}
-              modifiersClassNames={{ booked: "rdp-day_booked" }}
+              disabled={[{ before: new Date() }]}
+              modifiers={{ approved: approvedDays, pending: pendingDays }}
+              modifiersClassNames={{ approved: "rdp-day_approved", pending: "rdp-day_pending" }}
             />
           </div>
-          <p className="mt-2 flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-            <span className="inline-block h-2 w-2 rounded-full bg-red-400" /> Días ya reservados
-            (sala completa, no seleccionables)
+          <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-red-400" /> Ya tiene una reserva
+              aprobada ese día (aún puedes elegir otro horario libre)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-amber-400" /> Hay solicitudes
+              pendientes ese día
+            </span>
           </p>
         </div>
       </form>
